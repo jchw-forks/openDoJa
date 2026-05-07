@@ -1,6 +1,7 @@
 package opendoja.launcher;
 
 import opendoja.host.DoJaEncoding;
+import opendoja.host.JamNamedModuleResourceBridge;
 import opendoja.host.OpenDoJaLaunchArgs;
 
 import java.io.IOException;
@@ -39,6 +40,9 @@ final class LauncherProcessSupport {
         List<String> command = new ArrayList<>();
         command.add(Path.of(OpenDoJaLaunchArgs.get("java.home"), "bin", "java").toString());
         command.add(ENABLE_NATIVE_ACCESS_ARGUMENT);
+        // Some DoJa titles resolve app assets through java.base classes such as String.class.
+        // The named-module bridge needs this one open to install its boot-loader fallback.
+        command.add(JamNamedModuleResourceBridge.requiredAddOpensArgument());
         if (settings != null && settings.disableBytecodeVerification()) {
             command.add("-Xverify:none");
         }

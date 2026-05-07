@@ -51,6 +51,9 @@ public final class JamLauncher {
             throw new IllegalArgumentException("JAM/ADF missing AppClass: " + jamPath);
         }
         Path gameJarPath = locateGameJarIfPresent(jamPath, properties);
+        // Install the bridge before any app code runs so bootstrap-owned Class.getResource*
+        // lookups can still fall back to the selected JAM jar.
+        JamNamedModuleResourceBridge.install(gameJarPath);
         Class<?> rawClass = loadApplicationClass(appClassName.trim(), gameJarPath);
         if (!IApplication.class.isAssignableFrom(rawClass)) {
             throw new IllegalArgumentException("AppClass does not extend IApplication: " + appClassName);
@@ -123,6 +126,7 @@ public final class JamLauncher {
             throw new IllegalArgumentException("Usage: " + usageLine());
         }
         Path jamPath = Path.of(effectiveArgs.get(0));
+        LaunchCompatibility.reexecJamLauncherWithNamedModuleBridgeIfNeeded(jamPath);
         LaunchCompatibility.reexecJamLauncherIfNeeded(jamPath);
         try {
             launch(jamPath, true, launchType);

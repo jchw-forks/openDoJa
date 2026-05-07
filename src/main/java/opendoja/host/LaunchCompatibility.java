@@ -10,6 +10,21 @@ final class LaunchCompatibility {
     private LaunchCompatibility() {
     }
 
+    static void reexecJamLauncherWithNamedModuleBridgeIfNeeded(Path jamPath) throws IOException, InterruptedException {
+        if (JamNamedModuleResourceBridge.hasRequiredAddOpens()) {
+            return;
+        }
+        // The bridge reflects into the boot loader's java.base module table. Re-exec once with
+        // the narrow open we need so the default in-process launch path stays unchanged.
+        Process process = new ProcessBuilder(buildNamedModuleBridgeCommand(
+                        JamLauncher.class.getName(),
+                        new String[]{jamPath.toString()}))
+                .inheritIO()
+                .start();
+        int exit = process.waitFor();
+        System.exit(exit);
+    }
+
     static void reexecJamLauncherIfNeeded(Path jamPath) throws IOException, InterruptedException {
         if (OpenDoJaLaunchArgs.getBoolean(OpenDoJaLaunchArgs.LAUNCH_COMPAT_APPLIED)) {
             return;
@@ -123,6 +138,22 @@ final class LaunchCompatibility {
         appendFileEncoding(command);
         command.add("-D" + OpenDoJaLaunchArgs.VERIFY_FALLBACK_APPLIED + "=true");
         command.add("-Xverify:none");
+        command.add("-cp");
+        command.add(OpenDoJaLaunchArgs.get("java.class.path"));
+        command.add(mainClass);
+        for (String arg : args) {
+            command.add(arg);
+        }
+        return command;
+    }
+
+    private static List<String> buildNamedModuleBridgeCommand(String mainClass, String[] args) {
+        List<String> command = new ArrayList<>();
+        command.add(Path.of(OpenDoJaLaunchArgs.get("java.home"), "bin", "java").toString());
+        command.addAll(ManagementFactory.getRuntimeMXBean().getInputArguments());
+        appendCurrentOpenDoJaProperties(command);
+        appendFileEncoding(command);
+        command.add(JamNamedModuleResourceBridge.requiredAddOpensArgument());
         command.add("-cp");
         command.add(OpenDoJaLaunchArgs.get("java.class.path"));
         command.add(mainClass);
