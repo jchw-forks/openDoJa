@@ -1,6 +1,8 @@
 package opendoja.host;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.management.ManagementFactory;
 import java.lang.module.ModuleReader;
 import java.lang.module.ModuleReference;
@@ -182,6 +184,18 @@ public final class JamNamedModuleResourceBridge {
         }
 
         @Override
+        public Optional<InputStream> open(String name) throws IOException {
+            Optional<InputStream> opened = delegate.open(name);
+            if (opened.isPresent()) {
+                return opened;
+            }
+            // OpenDoJa's normal launch-resource API returns memory-backed streams because some
+            // titles assume one read(byte[]) fills the requested buffer. The named-module fallback
+            // has to preserve that same contract instead of exposing a raw jar URL stream.
+            return resourceSource.open(name);
+        }
+
+        @Override
         public Stream<String> list() throws IOException {
             return Stream.concat(delegate.list(), resourceSource.list()).distinct();
         }
@@ -239,6 +253,21 @@ public final class JamNamedModuleResourceBridge {
 
         private Stream<String> list() {
             return resourceNames.stream();
+        }
+
+        private Optional<InputStream> open(String name) throws IOException {
+            if (!resourceNames.contains(name)) {
+                return Optional.empty();
+            }
+            try (JarFile jarFile = new JarFile(gameJarPath.toFile())) {
+                JarEntry entry = jarFile.getJarEntry(name);
+                if (entry == null) {
+                    return Optional.empty();
+                }
+                try (InputStream in = jarFile.getInputStream(entry)) {
+                    return Optional.of(new ByteArrayInputStream(in.readAllBytes()));
+                }
+            }
         }
 
         private static boolean shouldExpose(JarEntry entry) {
