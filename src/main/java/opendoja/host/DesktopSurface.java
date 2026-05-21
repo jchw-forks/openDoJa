@@ -8,8 +8,9 @@ import java.util.function.Consumer;
 
 public final class DesktopSurface {
     private static final long PRESENT_SYNC_INTERVAL_NANOS = 16_000_000L;
+    private static final int PRESENTATION_BUFFER_COUNT = 3;
     private BufferedImage image;
-    private final BufferedImage[] presentationBuffers = new BufferedImage[2];
+    private final BufferedImage[] presentationBuffers = new BufferedImage[PRESENTATION_BUFFER_COUNT];
     private int presentationBufferIndex;
     private int backgroundColor = 0xFF000000;
     private Consumer<BufferedImage> repaintHook;
@@ -31,8 +32,7 @@ public final class DesktopSurface {
         g2.drawImage(image, 0, 0, null);
         g2.dispose();
         this.image = resized;
-        this.presentationBuffers[0] = null;
-        this.presentationBuffers[1] = null;
+        Arrays.fill(this.presentationBuffers, null);
         this.presentationBufferIndex = 0;
         this.depthBuffer = null;
         this.depthFrameActive = false;
@@ -111,13 +111,14 @@ public final class DesktopSurface {
     public synchronized BufferedImage copyForPresentation() {
         int width = image.getWidth();
         int height = image.getHeight();
-        presentationBufferIndex ^= 1;
+        presentationBufferIndex = (presentationBufferIndex + 1) % PRESENTATION_BUFFER_COUNT;
         BufferedImage copy = presentationBuffers[presentationBufferIndex];
         if (copy == null || copy.getWidth() != width || copy.getHeight() != height) {
             copy = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
             presentationBuffers[presentationBufferIndex] = copy;
         }
-        // Presentation must be a stable snapshot while the app continues drawing into `image`.
+        // Presentation must remain stable while the app keeps drawing and while the EDT may still
+        // be blitting one of the previous snapshots into the host window.
         Graphics2D g2 = copy.createGraphics();
         try {
             g2.drawImage(image, 0, 0, null);
