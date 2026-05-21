@@ -1,10 +1,10 @@
 package opendoja.probes;
 
+import com.nttdocomo.io.ConnectionException;
 import com.nttdocomo.ui.IApplication;
 import opendoja.host.DoJaRuntime;
 import opendoja.host.JamLauncher;
 
-import javax.microedition.io.ConnectionNotFoundException;
 import javax.microedition.io.Connector;
 import java.io.IOException;
 import java.io.InputStream;
@@ -62,8 +62,10 @@ public final class DragonBallRacingScratchpadProbe {
         try (InputStream input = Connector.openInputStream("scratchpad:///0;pos=800000,length=1")) {
             int first = input.read();
             System.out.println("out_of_bounds_open=unexpected_success first_byte=" + first);
-        } catch (ConnectionNotFoundException e) {
-            throw e;
+        } catch (ConnectionException e) {
+            System.out.println("out_of_bounds_open=rejected status=" + e.getStatus()
+                    + " type=" + e.getClass().getName()
+                    + " message=" + e.getMessage());
         } catch (IOException e) {
             System.out.println("out_of_bounds_open=rejected " + e.getClass().getName() + ": " + e.getMessage());
         }

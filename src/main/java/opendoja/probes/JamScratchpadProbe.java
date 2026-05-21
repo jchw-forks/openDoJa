@@ -1,5 +1,6 @@
 package opendoja.probes;
 
+import com.nttdocomo.io.ConnectionException;
 import com.nttdocomo.ui.IApplication;
 import opendoja.host.DoJaRuntime;
 import opendoja.host.JamLauncher;
@@ -296,14 +297,16 @@ public final class JamScratchpadProbe {
             try {
                 Connector.open("scratchpad:///0;pos=4,length=1").close();
                 throw new IllegalStateException("out-of-bounds scratchpad reads should fail at open time");
-            } catch (IOException expected) {
-                // Expected.
+            } catch (ConnectionException expected) {
+                check(expected.getStatus() == ConnectionException.SCRATCHPAD_OVERSIZE,
+                        "out-of-bounds scratchpad reads should report SCRATCHPAD_OVERSIZE");
             }
             try {
                 Connector.open("scratchpad:///1;pos=0,length=1").close();
                 throw new IllegalStateException("missing scratchpad segments should fail at open time");
-            } catch (IOException expected) {
-                // Expected.
+            } catch (ConnectionException expected) {
+                check(expected.getStatus() == ConnectionException.SCRATCHPAD_OVERSIZE,
+                        "missing scratchpad segments should report SCRATCHPAD_OVERSIZE");
             }
         } finally {
             DoJaRuntime runtime = DoJaRuntime.current();

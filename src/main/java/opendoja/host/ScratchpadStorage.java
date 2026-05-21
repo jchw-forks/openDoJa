@@ -1,5 +1,7 @@
 package opendoja.host;
 
+import com.nttdocomo.io.ConnectionException;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -275,22 +277,26 @@ final class ScratchpadStorage {
             int safeIndex = index < 0 || index >= HEADER_ENTRIES ? HEADER_ENTRIES : index;
             long normalizedPosition = Math.max(0L, position);
             if (safeIndex >= HEADER_ENTRIES) {
-                throw new IOException("Scratchpad segment " + index + " is out of range");
+                throw scratchpadOversize("Scratchpad segment " + index + " is out of range");
             }
             int segmentSize = sizes[safeIndex];
             if (normalizedPosition > segmentSize) {
-                throw new IOException("Scratchpad segment " + index
+                throw scratchpadOversize("Scratchpad segment " + index
                         + " position " + normalizedPosition
                         + " exceeds size " + segmentSize);
             }
             long available = Math.max(0L, segmentSize - normalizedPosition);
             if (requestedLength >= 0L && requestedLength > available) {
-                throw new IOException("Scratchpad segment " + index
+                throw scratchpadOversize("Scratchpad segment " + index
                         + " range [" + normalizedPosition + ", " + (normalizedPosition + requestedLength)
                         + ") exceeds size " + segmentSize);
             }
             long boundedLength = requestedLength < 0L ? available : requestedLength;
             return new ScratchpadAccess(offsets[safeIndex] + normalizedPosition, boundedLength);
+        }
+
+        private static ConnectionException scratchpadOversize(String message) {
+            return new ConnectionException(ConnectionException.SCRATCHPAD_OVERSIZE, message);
         }
     }
 }
