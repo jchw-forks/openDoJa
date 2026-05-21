@@ -271,17 +271,26 @@ final class ScratchpadStorage {
             return offsets.length == 0 ? 0L : offsets[offsets.length - 1] + sizes[sizes.length - 1];
         }
 
-        ScratchpadAccess access(int index, long position, long requestedLength) {
+        ScratchpadAccess access(int index, long position, long requestedLength) throws IOException {
             int safeIndex = index < 0 || index >= HEADER_ENTRIES ? HEADER_ENTRIES : index;
             long normalizedPosition = Math.max(0L, position);
             if (safeIndex >= HEADER_ENTRIES) {
-                return new ScratchpadAccess(normalizedPosition, 0L);
+                throw new IOException("Scratchpad segment " + index + " is out of range");
             }
             int segmentSize = sizes[safeIndex];
-            long clampedPosition = Math.min(normalizedPosition, segmentSize);
-            long available = Math.max(0L, segmentSize - clampedPosition);
-            long boundedLength = requestedLength < 0L ? available : Math.min(requestedLength, available);
-            return new ScratchpadAccess(offsets[safeIndex] + clampedPosition, boundedLength);
+            if (normalizedPosition > segmentSize) {
+                throw new IOException("Scratchpad segment " + index
+                        + " position " + normalizedPosition
+                        + " exceeds size " + segmentSize);
+            }
+            long available = Math.max(0L, segmentSize - normalizedPosition);
+            if (requestedLength >= 0L && requestedLength > available) {
+                throw new IOException("Scratchpad segment " + index
+                        + " range [" + normalizedPosition + ", " + (normalizedPosition + requestedLength)
+                        + ") exceeds size " + segmentSize);
+            }
+            long boundedLength = requestedLength < 0L ? available : requestedLength;
+            return new ScratchpadAccess(offsets[safeIndex] + normalizedPosition, boundedLength);
         }
     }
 }

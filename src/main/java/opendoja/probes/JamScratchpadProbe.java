@@ -34,6 +34,7 @@ public final class JamScratchpadProbe {
         verifyHeaderedScratchpadLargerThanDeclaredOverridesDeclaredSize();
         verifyDeclaredSizeMismatchWarning();
         verifyMissingResourceStaysMissingAndScratchpadStillReads();
+        verifyOutOfBoundsScratchpadAccessIsRejected();
         verifyScratchpadDataInputStreamMarkReset();
 
         System.out.println("Jam scratchpad probe OK");
@@ -271,6 +272,38 @@ public final class JamScratchpadProbe {
                 byte[] bytes = in.readNBytes(4);
                 check(Arrays.equals("DATA".getBytes(StandardCharsets.UTF_8), bytes),
                         "scratchpad:/// fallback should still read logical payload bytes");
+            }
+        } finally {
+            DoJaRuntime runtime = DoJaRuntime.current();
+            if (runtime != null) {
+                runtime.shutdown();
+            }
+        }
+        if (app == null) {
+            throw new IllegalStateException("Jam launch returned null application");
+        }
+    }
+
+    private static void verifyOutOfBoundsScratchpadAccessIsRejected() throws Exception {
+        Path root = Files.createTempDirectory("jam-sp-bounds");
+        Path jam = root.resolve("Bounds.jam");
+        Path scratchpad = root.resolve("Bounds.sp");
+        writeJam(jam, "SPsize=4\n");
+        Files.writeString(scratchpad, "DATA", StandardCharsets.UTF_8);
+
+        IApplication app = JamLauncher.launch(jam, false);
+        try {
+            try {
+                Connector.open("scratchpad:///0;pos=4,length=1").close();
+                throw new IllegalStateException("out-of-bounds scratchpad reads should fail at open time");
+            } catch (IOException expected) {
+                // Expected.
+            }
+            try {
+                Connector.open("scratchpad:///1;pos=0,length=1").close();
+                throw new IllegalStateException("missing scratchpad segments should fail at open time");
+            } catch (IOException expected) {
+                // Expected.
             }
         } finally {
             DoJaRuntime runtime = DoJaRuntime.current();
